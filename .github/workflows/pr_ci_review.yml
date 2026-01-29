@@ -1,0 +1,91 @@
+name: PR CI + AI Review
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
+jobs:
+  ci_and_review:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+
+      - name: Run CI checks (collect logs)
+        run: |
+          mkdir -p ci
+          set +e
+
+          ruff check . 2>&1 | tee ci/ruff.log
+          export RUFF_EXIT=$?
+
+          mypy sdlc_agent 2>&1 | tee ci/mypy.log
+          export MYPY_EXIT=$?
+
+          pytest -q 2>&1 | tee ci/pytest.log
+          export PYTEST_EXIT=$?
+
+          python - <<'PY'
+          import json, os
+          from pathlib import Path
+
+          def tail(p: Path, n: int = 2000) -> str:
+              if not p.exists():
+                  return ""
+              txt = p.read_text(encoding="utf-8", errors="replace")
+              return txt[-n:]
+
+          ci = {
+              "ruff": {"exit_code": int(os.getenv("RUFF_EXIT", "0")), "log_tail": tail(Path("ci/ruff.log"))},
+              "mypy": {"exit_code": int(os.getenv("MYPY_EXIT", "0")), "log_tail": tail(Path("ci/mypy.log"))},
+              "pytest": {"exit_code": int(os.getenv("PYTEST_EXIT", "0")), "log_tail": tail(Path("ci/pytest.log"))},
+          }
+          Path("ci/ci_results.json").write_text(json.dumps(ci, ensure_ascii=False, indent=2), encoding="utf-8")
+          PY
+
+          echo "RUFF_EXIT=$RUFF_EXIT" >> $GITHUB_ENV
+          echo "MYPY_EXIT=$MYPY_EXIT" >> $GITHUB_ENV
+          echo "PYTEST_EXIT=$PYTEST_EXIT" >> $GITHUB_ENV
+
+      - name: Run AI Reviewer
+        if: always()
+        env:
+          AGENT_GITHUB_TOKEN: ${{ secrets.AGENT_GITHUB_TOKEN }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OPENAI_MODEL: ${{ vars.OPENAI_MODEL || 'gpt-4o-mini' }}
+          AGENT_MAX_ITERS: ${{ vars.AGENT_MAX_ITERS || '3' }}
+        run: |
+          review-agent pr --repo "${{ github.repository }}" --pr "${{ github.event.pull_request.number }}" --ci-results ci/ci_results.json
+
+
+      - name: Upload CI artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-and-review-logs
+          path: |
+            ci/ci_results.json
+            ci/*.log
+      - name: Fail job if CI failed
+        if: always()
+        run: |
+          echo "ruff=$RUFF_EXIT mypy=$MYPY_EXIT pytest=$PYTEST_EXIT"
+          if [ "$RUFF_EXIT" -ne 0 ] || [ "$MYPY_EXIT" -ne 0 ] || [ "$PYTEST_EXIT" -ne 0 ]; then
+            echo "CI failed"
+            exit 1
+          fi

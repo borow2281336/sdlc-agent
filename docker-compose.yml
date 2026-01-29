@@ -1,0 +1,10 @@
+services:
+  agent:
+    build: .
+    image: sdlc-agent:local
+    env_file:
+      - .env
+    volumes:
+      - ./:/workspace
+    working_dir: /workspace
+    command: ["sleep", "infinity"]

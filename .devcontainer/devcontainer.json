@@ -1,0 +1,16 @@
+{
+  "name": "sdlc-agent-dev",
+  "dockerComposeFile": ["../docker-compose.yml"],
+  "service": "agent",
+  "workspaceFolder": "/workspace",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-python.python",
+        "ms-python.vscode-pylance",
+        "charliermarsh.ruff",
+        "ms-azuretools.vscode-docker"
+      ]
+    }
+  }
+}
