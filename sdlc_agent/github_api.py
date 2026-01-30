@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
 import re
-from typing import Any, Iterable
+from collections.abc import Iterable
+from dataclasses import dataclass
+from typing import Any
 from urllib.parse import urlparse
 
 import requests
@@ -49,6 +50,16 @@ class GitHubREST:
     @property
     def repo(self) -> str:
         return self.repo_full_name.split("/")[1]
+    
+    def viewer(self) -> dict[str, Any]:
+        """Return authenticated user for current token."""
+        return self._request("GET", "/user")
+
+    def viewer_login(self) -> str:
+        user = self.viewer()
+        return str(user.get("login") or "")
+
+    
 
     def _headers(self) -> dict[str, str]:
         return {
@@ -85,7 +96,7 @@ class GitHubREST:
         return self._request("GET", f"/repos/{self.owner}/{self.repo}/issues/{number}")
 
     def add_labels(self, number: int, labels: Iterable[str]) -> None:
-        labs = [l for l in labels if l]
+        labs = [label for label in labels if label]
         if not labs:
             return
         self._request(

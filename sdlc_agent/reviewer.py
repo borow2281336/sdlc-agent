@@ -8,12 +8,12 @@ from pathlib import Path
 from rich.console import Console
 from rich.panel import Panel
 
-from .github_api import GitHubREST, normalize_repo
 from .git_utils import git
+from .github_api import GitHubREST, normalize_repo
 from .llm import get_llm
 from .prompts import IssueContext, build_review_prompt
-from .state import AgentLabels, get_iteration
 from .settings import Settings
+from .state import AgentLabels, get_iteration
 from .text_utils import extract_first_json
 
 console = Console()
@@ -68,6 +68,30 @@ def run_pr_review(
     pr = gh.get_pull(pr_number)
     pr_body = pr.get("body") or ""
     pr_title = pr.get("title") or f"PR #{pr_number}"
+
+    pr_author = str((pr.get("user") or {}).get("login") or "")
+    reviewer_login = gh.viewer_login()
+
+    if pr_author and reviewer_login and pr_author.lower() == reviewer_login.lower():
+        labels = AgentLabels()
+        msg = (
+            " **Self-review запрещён** (Reviewer и автор PR — один и тот же аккаунт).\n\n"
+            f"- PR author: `{pr_author}`\n"
+            f"- Reviewer token user: `{reviewer_login}`\n\n"
+            "Нужно настроить `REVIEWER_GITHUB_TOKEN` от другого аккаунта. "
+            "Останавливаю авто-цикл."
+        )
+        gh.create_issue_comment(pr_number, msg)
+        gh.add_labels(pr_number, [labels.stopped])
+        _safe_remove_label(gh, pr_number, labels.fix)
+
+        step_summary_path = os.getenv("GITHUB_STEP_SUMMARY")
+        if step_summary_path:
+            Path(step_summary_path).write_text(msg + "\n", encoding="utf-8")
+
+        return
+
+
 
     issue_number = _find_issue_number_in_pr_body(pr_body)
     if not issue_number:
@@ -130,7 +154,7 @@ def run_pr_review(
     # Labels / iteration limit
     labels = AgentLabels()
     pr_issue = gh.get_issue(pr_number)
-    pr_labels = [l["name"] for l in pr_issue.get("labels", [])]
+    pr_labels = [label["name"] for label in pr_issue.get("labels", [])]
     cur_iter = get_iteration(pr_labels)
     max_iters = settings.max_iters
 
@@ -139,7 +163,7 @@ def run_pr_review(
         event = "COMMENT"
         gh.add_labels(pr_number, [labels.stopped])
         review_md = (
-            f"🛑 Лимит итераций достигнут ({max_iters}). Авто-исправления остановлены.\n\n"
+            f" Лимит итераций достигнут ({max_iters}). Авто-исправления остановлены.\n\n"
             + review_md
         )
 
@@ -168,10 +192,10 @@ def run_pr_review(
     # 3) PR review object (Approve / Request changes)
     gh.create_pull_review(pr_number, body=review_md or summary_md or "AI review", event=event)
 
-    # 4) Labels for next cycle
+
     if needs_changes:
         gh.add_labels(pr_number, [labels.fix])
-        # Do not remove managed label; keep.
+
         _safe_remove_label(gh, pr_number, labels.done)
     else:
         gh.add_labels(pr_number, [labels.done])
@@ -183,5 +207,5 @@ def run_pr_review(
 def _safe_remove_label(gh: GitHubREST, number: int, label: str) -> None:
     try:
         gh.remove_label(number, label)
-    except Exception:  # noqa: BLE001
+    except Exception:
         return
