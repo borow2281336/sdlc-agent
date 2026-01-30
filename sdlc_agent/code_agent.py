@@ -27,7 +27,7 @@ from .git_utils import (
     set_origin_with_token,
     working_tree_dirty,
 )
-from .llm.openai_chat import OpenAIChatLLM
+from .llm import get_llm
 from .prompts import IssueContext, build_file_select_prompt, build_patch_prompt
 from .state import AgentLabels, get_iteration, iter_labels
 from .settings import Settings
@@ -112,15 +112,6 @@ def _checkout_branch(workdir: Path, branch: str) -> None:
     git(["checkout", "-B", branch, f"origin/{branch}"], cwd=workdir, check=False)
 
 
-def _require_llm(settings: Settings) -> OpenAIChatLLM:
-    if not settings.openai_api_key:
-        raise RuntimeError("OPENAI_API_KEY is required (set env var)")
-    return OpenAIChatLLM(
-        api_key=settings.openai_api_key,
-        model=settings.openai_model,
-        base_url=settings.openai_base_url,
-    )
-
 
 def run_issue(*, repo: str, issue_number: int, repo_dir: Path | None, settings: Settings) -> None:
     """Process Issue -> create/update PR."""
@@ -141,7 +132,7 @@ def run_issue(*, repo: str, issue_number: int, repo_dir: Path | None, settings: 
     base_branch = settings.base_branch or gh.default_branch()
     branch = f"agent/issue-{issue_number}"
 
-    llm = _require_llm(settings)
+    llm = get_llm(settings)
     workdir = _ensure_repo_dir(repo_full_name, token=settings.github_token, repo_dir=repo_dir)
 
     console.print(
@@ -296,7 +287,7 @@ def run_fix(*, repo: str, pr_number: int, repo_dir: Path | None, settings: Setti
 
     feedback = _find_latest_reviewer_feedback(gh, pr_number)
 
-    llm = _require_llm(settings)
+    llm = get_llm(settings)
     workdir = _ensure_repo_dir(repo_full_name, token=settings.github_token, repo_dir=repo_dir)
 
     console.print(

@@ -10,7 +10,7 @@ from rich.panel import Panel
 
 from .github_api import GitHubREST, normalize_repo
 from .git_utils import git
-from .llm.openai_chat import OpenAIChatLLM
+from .llm import get_llm
 from .prompts import IssueContext, build_review_prompt
 from .state import AgentLabels, get_iteration
 from .settings import Settings
@@ -91,14 +91,8 @@ def run_pr_review(
     if not diff:
         diff = "(diff пуст)"
 
-    if not settings.openai_api_key:
-        raise RuntimeError("OPENAI_API_KEY is required for Reviewer Agent")
 
-    llm = OpenAIChatLLM(
-        api_key=settings.openai_api_key,
-        model=settings.openai_model,
-        base_url=settings.openai_base_url,
-    )
+    llm = get_llm(settings)
 
     prompt = build_review_prompt(
         issue=issue_ctx,

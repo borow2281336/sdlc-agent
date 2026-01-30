@@ -7,4 +7,4 @@ services:
     volumes:
       - ./:/workspace
     working_dir: /workspace
-    command: ["sleep", "infinity"]
+    command: ["sh", "-c", "tail -f /dev/null"]
