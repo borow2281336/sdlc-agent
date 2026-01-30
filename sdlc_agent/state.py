@@ -3,7 +3,6 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 
-
 LABEL_MANAGED = "agent:managed"
 LABEL_FIX = "agent:fix"
 LABEL_DONE = "agent:done"

@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
 import os
+from dataclasses import dataclass
+from typing import Literal
 
 
 @dataclass(frozen=True)
@@ -26,18 +27,13 @@ class Settings:
     git_user_email: str = "sdlc-agent[bot]@users.noreply.github.com"
 
     @classmethod
-    def from_env(cls) -> "Settings":
-        token = os.getenv("AGENT_GITHUB_TOKEN") or os.getenv("GITHUB_TOKEN")
-        if not token:
-            raise RuntimeError(
-                "Missing GitHub token. Set AGENT_GITHUB_TOKEN (recommended) or GITHUB_TOKEN."
-            )
+    def from_env(cls, *, actor: Literal["code", "reviewer"] = "code") -> Settings:
+        if actor == "code":
+            token = os.getenv("CODE_AGENT_GITHUB_TOKEN") or os.getenv("AGENT_GITHUB_TOKEN") or os.getenv("GITHUB_TOKEN")
+        else:
+            token = os.getenv("REVIEWER_GITHUB_TOKEN") or os.getenv("GITHUB_TOKEN") or os.getenv("AGENT_GITHUB_TOKEN")
 
-        max_iters_str = os.getenv("AGENT_MAX_ITERS", "3")
-        try:
-            max_iters = int(max_iters_str)
-        except ValueError as e:
-            raise RuntimeError(f"AGENT_MAX_ITERS must be an int, got: {max_iters_str!r}") from e
+        max_iters = int(os.getenv("AGENT_MAX_ITERS", "3"))
 
         return cls(
             github_token=token,

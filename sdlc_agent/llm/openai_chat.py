@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
 import json
+from dataclasses import dataclass
 from typing import Any
 
 import requests
@@ -37,7 +37,7 @@ class OpenAIChatLLM:
         data = resp.json()
         try:
             return data["choices"][0]["message"]["content"]
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             raise LLMError(f"Unexpected OpenAI response format: {data}") from e
 
     def complete(self, *, system: str, user: str, temperature: float = 0.2) -> str:

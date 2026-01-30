@@ -3,7 +3,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from textwrap import dedent
 
-
 CODE_AGENT_SYSTEM = dedent(
     """    Ты автономный **Code Agent** в GitHub SDLC пайплайне.
 

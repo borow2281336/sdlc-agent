@@ -4,7 +4,6 @@ import json
 import re
 from typing import Any
 
-
 _JSON_CODEBLOCK_RE = re.compile(r"```json\s*(?P<body>\{.*?\})\s*```", re.DOTALL)
 _ANY_CODEBLOCK_RE = re.compile(
     r"```(?P<lang>[a-zA-Z0-9_-]+)?\s*(?P<body>.*?)\s*```", re.DOTALL
@@ -32,9 +31,7 @@ def extract_first_json(text: str) -> Any:
     if m:
         return json.loads(m.group("body"))
 
-    # fallback: find first {...} that parses
-    candidates = []
-    # Greedy find all {...} spans (simple heuristic)
+
     for m2 in re.finditer(r"\{", text):
         start = m2.start()
         for end in range(len(text) - 1, start, -1):

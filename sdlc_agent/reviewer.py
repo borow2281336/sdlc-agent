@@ -66,6 +66,7 @@ def run_pr_review(
     gh = GitHubREST(token=settings.github_token, repo_full_name=repo_full_name, api_base=settings.github_api_base)
 
     pr = gh.get_pull(pr_number)
+    
     pr_body = pr.get("body") or ""
     pr_title = pr.get("title") or f"PR #{pr_number}"
 
@@ -209,3 +210,4 @@ def _safe_remove_label(gh: GitHubREST, number: int, label: str) -> None:
         gh.remove_label(number, label)
     except Exception:
         return
+
